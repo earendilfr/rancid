@@ -380,7 +380,7 @@ proc get_prompt { prompt } {
         }
         -re "^.+$reprompt"    {
             set junk $expect_out(0,string);
-            regsub -all "\[\]\[\(\)+]" $junk {\\&} prompt;
+            regsub -all "\[\]\[\(\)\*+]" $junk {\\&} prompt;
         }
     }
     set in_proc 0

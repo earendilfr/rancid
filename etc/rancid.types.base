@@ -42,6 +42,7 @@ agm;script;agmrancid
 alteon;script;arancid
 alteon;login;alogin
 #
+# AKA Arbos and Peakflow
 arbor;script;rancid -t arbor
 arbor;login;anlogin
 arbor;module;arbor
@@ -262,7 +263,7 @@ cisco-nx;command;nxos::WriteTerm;show running-config
 #
 # Cisco small business devices.  These are peculiar; most likely this will not
 # work with all of them, but is also reported to work with other Marvell OEMs,
-# including PowerConnect 5448
+# including PowerConnect 5448, some Transition Networks switches
 ios-sb;alias;cisco-sb
 cisco-sb;script;rancid -t cisco-sb
 cisco-sb;login;csblogin
@@ -813,7 +814,8 @@ paloalto;command;panos::ShowInfo;show system info
 paloalto;command;panos::ShowInventory;show chassis inventory
 paloalto;command;panos::ShowConfig;show config running
 #
-# XML configuration version of paloalto.  See mail:
+# XML configuration version of paloalto.
+# XML is possibly the only format that can be loaded   See mail:
 # https://shrubbery.net/pipermail/rancid-discuss/2021-September/011073.html
 paloaltoxml;script;rancid -t paloaltoxml
 paloaltoxml;login;panlogin
@@ -892,6 +894,7 @@ sros-md;command;sros::ShowChassisPS;show chassis power-supply
 sros-md;command;sros::ShowChassisPM;show chassis power-management
 sros-md;command;sros::ShowCardState;show card state
 sros-md;command;sros::ShowCardDetail;show card detail
+sros-md;command;sros::ShowPortDetail;show port detail
 sros-md;command;sros::ShowDebug;//show debug
 sros-md;command;sros::ShowBOF;//show bof
 sros-md;command;sros::WriteTermMD;admin show configuration

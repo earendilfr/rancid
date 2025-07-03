@@ -120,6 +120,7 @@ sub ShowBOF {
 	ProcessHistory("BOF","","","# $_");
     }
 }
+
 # This routine parses "show card detail"
 sub ShowCardDetail {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -180,6 +181,7 @@ sub ShowCardDetail {
 	ProcessHistory("COMMENTS","keysort","E6","# $_");
     }
 }
+
 # This routine parses "show card state"
 sub ShowCardState {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -200,6 +202,7 @@ sub ShowCardState {
 	ProcessHistory("COMMENTS","keysort","E5","# $_");
     }
 }
+
 # This routine parses "show chassis"
 sub ShowChassis {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -231,6 +234,7 @@ sub ShowChassis {
     }
     ProcessHistory("COMMENTS","keysort","E1","#\n");
 }
+
 # This routine parses "show chassis environment"
 sub ShowChassisEnv {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -262,6 +266,7 @@ TOP: while (<$INPUT>) {
 	ProcessHistory("COMMENTS","keysort","E3","# $_");
     }
 }
+
 # This routine parses "show chassis power-supply"
 sub ShowChassisPS {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -281,9 +286,11 @@ sub ShowChassisPS {
 	/^\[[^]]*]$/i && next;
 
 	/[-=]+$/i && next;
+	/input voltage/i && next;
 	ProcessHistory("COMMENTS","keysort","E4","# $_");
     }
 }
+
 # This routine parses "show chassis power-management"
 sub ShowChassisPM {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -309,6 +316,7 @@ sub ShowChassisPM {
 	ProcessHistory("COMMENTS","keysort","E5","# $_");
     }
 }
+
 # This routine parses "show debug"
 sub ShowDebug {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -330,13 +338,14 @@ sub ShowDebug {
 	ProcessHistory("","","","$_");
     }
 }
+
 # This routine parses "show mda detail"
 sub ShowMDA {
     my($INPUT, $OUTPUT, $cmd) = @_;
     print STDERR "    In ShowMDA: $_" if ($debug);
     ProcessHistory("COMMENTS","keysort","E2","# $_");
 
-    while (<$INPUT>) {
+TOP: while (<$INPUT>) {
 	tr/\015//d;
 	last if (/^$prompt/);
 	next if (/^(\s*$cmd\s*)$/);
@@ -372,6 +381,42 @@ sub ShowMDA {
 	ProcessHistory("COMMENTS","keysort","E2","# $_");
     }
 }
+
+# This routine parses "show port detail"
+sub ShowPortDetail {
+    my($INPUT, $OUTPUT, $cmd) = @_;
+    my($text);
+    print STDERR "    In ShowPortDetail: $_" if ($debug);
+    ProcessHistory("COMMENTS","keysort","E6","#\n# $_");
+
+TOP: while (<$INPUT>) {
+	tr/\015//d;
+	last if (/^$prompt/);
+	next if (/^(\s*|\s*$cmd\s*)$/);
+	next if (/^\s+\^$/);
+	return(-1) if (/error: invalid parameter/i);
+	return(-1) if (/minor: cli command not allowed for this user/i);
+	# context lines
+	/^\[[^]]*]$/i && next;
+
+	# accumulate interface name and description; only print if it has a xcvr
+	/^(Interface\s+:\s+\S+)/ && ($text = "# $1\n" . $text);
+	/^(Description\s+:\s+)/ && ($text = "# $_");
+	if (/^transceiver status\s*:\s*/i) {
+	    next TOP if (/not-equipped/);
+	    ProcessHistory("COMMENTS","keysort","E8","$text");
+	    while (<$INPUT>) {
+		tr/\015//d;
+		last TOP if (/^$prompt/);
+		last if (/(^\s*$|^[-=]+)/);
+		ProcessHistory("COMMENTS","keysort","E8","# $_");
+	    }
+	}
+
+	/[-=]+$/i && next;
+    }
+}
+
 # This routine parses "show redundancy synchronization"
 sub ShowRedundancy {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -400,6 +445,7 @@ sub ShowRedundancy {
 	ProcessHistory("COMMENTS","keysort","D2","# $_");
     }
 }
+
 # This routine parses "show system information"
 sub ShowSystemInfo {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -440,6 +486,7 @@ sub ShowSystemInfo {
 	ProcessHistory("COMMENTS","keysort","C1","# $_");
     }
 }
+
 # This routine parses "admin display-config index"
 sub WriteTermIndex {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -466,6 +513,7 @@ sub WriteTermIndex {
 	ProcessHistory("","","","$_");
     }
 }
+
 # This routine parses "admin display-config"
 sub WriteTerm {
     my($INPUT, $OUTPUT, $cmd) = @_;

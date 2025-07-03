@@ -203,6 +203,7 @@ cisco;command;ios::ShowVLAN;show vlan
 cisco;command;ios::ShowVLAN;show vlan-switch
 cisco;command;ios::ShowDetail;show switch detail
 cisco;command;ios::ShowSDM;show sdm prefer
+cisco;command;ios::ShowIBNS;authentication display config-mode
 cisco;command;ios::ShowMTU;show system mtu
 cisco;command;ios::ShowDebug;show debug
 cisco;command;ios::ShowShun;show shun;ASA/PIX

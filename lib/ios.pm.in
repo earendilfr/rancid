@@ -712,6 +712,28 @@ sub ShowLicense {
     return(0);
 }
 
+# This routine parse "authentication display config-mode"
+sub ShowIBNS {
+    my ($INPUT, $OUTPUT, $cmd) = @_;
+    print STDERR "    In showIBNS: $_", if ($debug);
+    while (<$INPUT>) {
+        tr/\015//d;
+        last if (/^$prompt/);
+        next if (/^(\s*|\s*$cmd\s*)$/);
+        next if (/^\s+\^$/);
+        return(1) if (/Line has invalid autocommand /);
+        return(1) if (/(invalid (input|command) detected|type help or )/i);
+
+        if (/^Current configuration mode is new-style/) {
+            ProcessHistory("COMMENTS","","","!IBNS version: 2.0\n");
+        } elsif (/^Current configuration mode is legacy/) {
+            ProcessHistory("COMMENTS","","","!IBNS version: 1.0\n");
+        }
+    }
+    ProcessHistory("COMMENTS","","","!\n");
+    return(0);
+}
+
 # This routine parses "showMTU"
 sub ShowMTU {
     my($INPUT, $OUTPUT, $cmd) = @_;
@@ -2421,7 +2443,6 @@ sub WriteTerm {
     my($comment, $linecnt) = (0,0);
 
     while (<$INPUT>) {
-TOP:
 	tr/\015//d;
 	last if (/^$prompt/);
 	return(1) if (!$linecnt && /^\s+\^\s*$/);
@@ -2484,37 +2505,37 @@ TOP:
 	}
 	$comment = 0;
 
-	# Dog gone Cool matches to process the rest of the config
-	/^tftp-server flash /   && next; # kill any tftp remains
-	/^ntp clock-period /    && next; # kill ntp clock-period
-	/^ clockrate /		&& next; # kill clockrate on serial interfaces
-	# kill rx/txspeed (particularly on cellular modem cards)
-	if (/^(line (\d+(\/\d+\/\d+)?|con|aux|vty))/) {
-	    my($key) = $1;
-	    my($lineauto) = (0);
-	    if ($key =~ /con/) {
-		$key = -1;
-	    } elsif ($key =~ /aux/) {
-		$key = -2;
-	    } elsif ($key =~ /vty/) {
-		$key = -3;
-	    }
-	    ProcessHistory("LINE","keysort","$key","$_");
-	    while (<$INPUT>) {
-		tr/\015//d;
-		last if (/^$prompt/);
-		goto TOP if (! /^ /);
-		next if (/\s*(rx|tx)speed \d+/);
-		next if (/^ length /);	# kill length on serial lines
-		next if (/^ width /);	# kill width on serial lines
-		$lineauto = 0 if (/^[^ ]/);
-		$lineauto = 1 if /^ modem auto/;
-		/^ speed / && $lineauto	&& next; # kill speed on serial lines
-		if (/^(\s+password) \d+ / && $filter_pwds >= 1) {
-		    $_ = "!$1 <removed>\n";
-		}
-		ProcessHistory("LINE","keysort","$key","$_");
-	    }
+    # Dog gone Cool matches to process the rest of the config
+    /^tftp-server flash /   && next; # kill any tftp remains
+    /^ntp clock-period /    && next; # kill ntp clock-period
+    /^ clockrate /		&& next; # kill clockrate on serial interfaces
+    # kill rx/txspeed (particularly on cellular modem cards)
+    if (/^(line (\d+(\/\d+\/\d+)?|con|aux|vty))/) {
+        my($key) = $1;
+        my($lineauto) = (0);
+        if ($key =~ /con/) {
+            $key = -1;
+        } elsif ($key =~ /aux/) {
+            $key = -2;
+        } elsif ($key =~ /vty/) {
+            $key = -3;
+        }
+        ProcessHistory("LINE","keysort","$key","$_");
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^[ !]/);
+            next if (/\s*(rx|tx)speed \d+/);
+            next if (/^ length /);	# kill length on serial lines
+            next if (/^ width /);	# kill width on serial lines
+            $lineauto = 0 if (/^[^ ]/);
+            $lineauto = 1 if /^ modem auto/;
+            /^ speed / && $lineauto	&& next; # kill speed on serial lines
+            if (/^(\s+password) \d+ / && $filter_pwds >= 1) {
+                $_ = "!$1 <removed>\n";
+            }
+            ProcessHistory("LINE","keysort","$key","$_");
+        }
+        redo;
 	}
 	if (/^(enable )?(password|passwd)( level \d+)? / && $filter_pwds >= 1) {
 	    ProcessHistory("ENABLE","","","!$1$2$3 <removed>\n");
@@ -2673,24 +2694,366 @@ TOP:
 		}
 	    }
 	    ProcessHistory("EXPATH","keysort","$key","$expath");
+        redo;
 	}
 	# sort route-maps
 	if (/^route-map (\S+)/) {
 	    my($key) = $1;
 	    my($routemap) = $_;
 	    while (<$INPUT>) {
-		tr/\015//d;
-		last if (/^$prompt/ || ! /^(route-map |[ !])/);
-		if (/^route-map (\S+)/) {
-		    ProcessHistory("ROUTEMAP","keysort","$key","$routemap");
-		    $key = $1;
-		    $routemap = $_;
-		} else  {
-		    $routemap .= $_;
-		}
+		    tr/\015//d;
+		    last if (/^$prompt/ || ! /^(route-map |[ !])/);
+		    if (/^route-map (\S+)/) {
+		        ProcessHistory("ROUTEMAP","keysort","$key","$routemap");
+		        $key = $1;
+		        $routemap = $_;
+		    } else  {
+		        $routemap .= $_;
+		    }
 	    }
 	    ProcessHistory("ROUTEMAP","keysort","$key","$routemap");
+        redo;
 	}
+    # sort aaa attribute list
+    if (/^aaa attribute list (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(aaa attribute list |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^aaa attribute list (\S+)/) {
+                ProcessHistory("AAA_ATTRIBUTE_LIST","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = "$_";
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $comment = 0;
+                $sortdata .= $_;
+            }
+        }
+        ProcessHistory("AAA_ATTRIBUTE_LIST","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort crypto ikev2 authorization policy
+    if (/^crypto ikev2 authorization policy (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(crypto ikev2 authorization policy |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^crypto ikev2 authorization policy (\S+)/) {
+                ProcessHistory("CRYPTO_IKEv2_AUTH_POLICY","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("CRYPTO_IKEv2_AUTH_POLICY","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort crypto ikev2 profile
+    if (/^crypto ikev2 profile (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(crypto ikev2 profile |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^crypto ikev2 profile (\S+)/) {
+                ProcessHistory("CRYPTO_IKEv2_PROFILE","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("CRYPTO_IKEv2_PROFILE","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort crypto ipsec transform-set
+    if (/^crypto ipsec transform-set (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(crypto ipsec transform-set |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^crypto ipsec transform-set (\S+)/) {
+                ProcessHistory("CRYPTO_IPSEC_TRANSFORM_SET","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("CRYPTO_IPSEC_TRANSFORM_SET","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort crypto ipsec profile
+    if (/^crypto ipsec profile (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(crypto ipsec profile |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^crypto ipsec authorization policy (\S+)/) {
+                ProcessHistory("CRYPTO_IPSEC_PROFILE","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("CRYPTO_IPSEC_PROFILE","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort netflow objects/record
+    if (/^flow record (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(flow record |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^flow record (\S+)/) {
+                ProcessHistory("FLOW_RECORD","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("FLOW_RECORD","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort netflow objects/exporter
+    if (/^flow exporter (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(flow exporter |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^flow exporter (\S+)/) {
+                ProcessHistory("FLOW_EXPORTER","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("FLOW_EXPORTER","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort netflow objects/monitor
+    if (/^flow monitor (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(flow monitor |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^flow monitor (\S+)/) {
+                ProcessHistory("FLOW_MONITOR","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("FLOW_MONITOR","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort class-map
+    if (/^class-map match-(any|all) (\S+)/) {
+        my ($match, $key) = ($1,$2);
+        my ($sortdata) = $_;
+        while(<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(class-map | )/);
+            next if ($comment && /^!\s*$/);
+            if (/^class-map match-(any|all) (\S+)/) {
+                ProcessHistory("CLASSMAP","keysort","$match:$key","$sortdata");
+                ($match, $key) = ($1, $2);
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("CLASSMAP","keysort","$match:$key","$sortdata");
+        redo;
+    }
+    # sort policy-map
+    if (/^policy-map (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while(<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(policy-map | )/);
+            next if ($comment && /^!\s*$/);
+            if (/^policy-map (\S+)/) {
+                ProcessHistory("POLICYMAP","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("POLICYMAP","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort router eigrp af-interface
+    if (/^router eigrp (\S+)/) {
+        my ($eigrp) = $1;
+        ProcessHistory("","","","$_");
+        while(<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || /^!/);
+            if (/^(\s+)af-interface (\S+)/) {
+                my ($head, $key) = ($1,$2);
+                my ($sortdata) = $_;
+                while(<$INPUT>) {
+                    tr/\015//d;
+                    last if (/^$prompt/ || ! /^$head(exit-af-interface|[ !])/);
+                    if (/^(\s+)af-interface (\S+)/) {
+                        ProcessHistory("EIGRP_AF_INTERFACE", "keysort", "$eigrp:$key", "$sortdata");
+                        ($head, $key) = ($1,$2);
+                        $sortdata = $_;
+                    } elsif (/^\s(\s*password) / && $filter_pwds >= 1) {
+                        $sortdata .= "!$1 <removed>\n";
+                    } else {
+                         $sortdata .= $_;
+                    }
+                }
+                ProcessHistory("EIGRP_AF_INTERFACE", "keysort", "$eigrp:$key", "$sortdata");
+            }
+            ProcessHistory("","","","$_");
+        }
+        redo;
+    }
+    # sort router ospf instance
+    if (/^router ospf (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(router ospf |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^router ospf (\S+)/) {
+                ProcessHistory("OSPF","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $comment = 0;
+                $sortdata .= $_;
+            }
+        }
+        ProcessHistory("OSPF","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort router bgp template
+    if (/^router bgp (\S+)/) {
+        my ($bgp) = $1;
+        ProcessHistory("","","","$_");
+        while(<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || /^!/);
+            if (/^(\s+)template peer-(policy|session) (\S+)/) {
+                my ($head,$type,$key) = ($1,$2,$3);
+                my ($template) = $_;
+                while(<$INPUT>) {
+                    tr/\015//d;
+                    last if (/^$prompt/ || ! /^$head(template peer-|exit-peer-|[ !])/);
+                    if (/^(\s+)template peer-(policy|session) (\S+)/) {
+                        ProcessHistory("BGP_TEMPLATE", "keysort", "$bgp:$type:$key", "$template");
+                        ($head,$type,$key) = ($1,$2,$3);
+                        $template = $_;
+                    } elsif (/^\s(\s*password) / && $filter_pwds >= 1) {
+                        $template .= "!$1 <removed>\n";
+                    } else {
+                        $template .= $_;
+                    }
+                }
+                ProcessHistory("BGP_TEMPLATE", "keysort", "$bgp:$type:$key", "$template");
+            }
+            if (/^\s+neighbor (\S+)/) {
+                my ($key) = $1;
+                my $neighbor = $_;
+                while (<$INPUT>) {
+                    tr/\015//d;
+                    last if (/^$prompt/ || ! /^\s+neighbor /);
+                    if (/^\s+neighbor (\S+)/ and $1 ne $key) {
+                        ProcessHistory("BGP_NEIGHBOR","keysort","$bgp:$key","$neighbor");
+                        $key = $1;
+                        $neighbor = $_;
+                    } elsif (/^\s(\s*neighbor) $key password / && $filter_pwds >= 1) {
+                        $neighbor .= "!$1 $key password <removed>\n";
+                    } else {
+                        $neighbor .= $_;
+                    }
+                }
+                ProcessHistory("BGP_NEIGHBOR","keysort","$bgp:$key","$neighbor");
+            }
+            ProcessHistory("","","","$_");
+        }
+        redo;
+    }
 	# filter out any RCS/CVS tags to avoid confusing local CVS storage
 	s/\$(Revision|Id):/ $1:/;
 	# order access-lists

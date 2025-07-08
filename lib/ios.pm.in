@@ -2443,7 +2443,6 @@ sub WriteTerm {
     my($comment, $linecnt) = (0,0);
 
     while (<$INPUT>) {
-TOP:
 	tr/\015//d;
 	last if (/^$prompt/);
 	return(1) if (!$linecnt && /^\s+\^\s*$/);
@@ -2506,37 +2505,37 @@ TOP:
 	}
 	$comment = 0;
 
-	# Dog gone Cool matches to process the rest of the config
-	/^tftp-server flash /   && next; # kill any tftp remains
-	/^ntp clock-period /    && next; # kill ntp clock-period
-	/^ clockrate /		&& next; # kill clockrate on serial interfaces
-	# kill rx/txspeed (particularly on cellular modem cards)
-	if (/^(line (\d+(\/\d+\/\d+)?|con|aux|vty))/) {
-	    my($key) = $1;
-	    my($lineauto) = (0);
-	    if ($key =~ /con/) {
-		$key = -1;
-	    } elsif ($key =~ /aux/) {
-		$key = -2;
-	    } elsif ($key =~ /vty/) {
-		$key = -3;
-	    }
-	    ProcessHistory("LINE","keysort","$key","$_");
-	    while (<$INPUT>) {
-		tr/\015//d;
-		last if (/^$prompt/);
-		goto TOP if (! /^ /);
-		next if (/\s*(rx|tx)speed \d+/);
-		next if (/^ length /);	# kill length on serial lines
-		next if (/^ width /);	# kill width on serial lines
-		$lineauto = 0 if (/^[^ ]/);
-		$lineauto = 1 if /^ modem auto/;
-		/^ speed / && $lineauto	&& next; # kill speed on serial lines
-		if (/^(\s+password) \d+ / && $filter_pwds >= 1) {
-		    $_ = "!$1 <removed>\n";
-		}
-		ProcessHistory("LINE","keysort","$key","$_");
-	    }
+    # Dog gone Cool matches to process the rest of the config
+    /^tftp-server flash /   && next; # kill any tftp remains
+    /^ntp clock-period /    && next; # kill ntp clock-period
+    /^ clockrate /		&& next; # kill clockrate on serial interfaces
+    # kill rx/txspeed (particularly on cellular modem cards)
+    if (/^(line (\d+(\/\d+\/\d+)?|con|aux|vty))/) {
+        my($key) = $1;
+        my($lineauto) = (0);
+        if ($key =~ /con/) {
+            $key = -1;
+        } elsif ($key =~ /aux/) {
+            $key = -2;
+        } elsif ($key =~ /vty/) {
+            $key = -3;
+        }
+        ProcessHistory("LINE","keysort","$key","$_");
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^[ !]/);
+            next if (/\s*(rx|tx)speed \d+/);
+            next if (/^ length /);	# kill length on serial lines
+            next if (/^ width /);	# kill width on serial lines
+            $lineauto = 0 if (/^[^ ]/);
+            $lineauto = 1 if /^ modem auto/;
+            /^ speed / && $lineauto	&& next; # kill speed on serial lines
+            if (/^(\s+password) \d+ / && $filter_pwds >= 1) {
+                $_ = "!$1 <removed>\n";
+            }
+            ProcessHistory("LINE","keysort","$key","$_");
+        }
+        redo;
 	}
 	if (/^(enable )?(password|passwd)( level \d+)? / && $filter_pwds >= 1) {
 	    ProcessHistory("ENABLE","","","!$1$2$3 <removed>\n");
@@ -2715,40 +2714,244 @@ TOP:
 	    ProcessHistory("ROUTEMAP","keysort","$key","$routemap");
         redo;
 	}
+    # sort aaa attribute list
+    if (/^aaa attribute list (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(aaa attribute list |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^aaa attribute list (\S+)/) {
+                ProcessHistory("AAA_ATTRIBUTE_LIST","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = "$_";
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $comment = 0;
+                $sortdata .= $_;
+            }
+        }
+        ProcessHistory("AAA_ATTRIBUTE_LIST","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort crypto ikev2 authorization policy
+    if (/^crypto ikev2 authorization policy (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(crypto ikev2 authorization policy |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^crypto ikev2 authorization policy (\S+)/) {
+                ProcessHistory("CRYPTO_IKEv2_AUTH_POLICY","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("CRYPTO_IKEv2_AUTH_POLICY","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort crypto ikev2 profile
+    if (/^crypto ikev2 profile (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(crypto ikev2 profile |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^crypto ikev2 profile (\S+)/) {
+                ProcessHistory("CRYPTO_IKEv2_PROFILE","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("CRYPTO_IKEv2_PROFILE","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort crypto ipsec transform-set
+    if (/^crypto ipsec transform-set (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(crypto ipsec transform-set |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^crypto ipsec transform-set (\S+)/) {
+                ProcessHistory("CRYPTO_IPSEC_TRANSFORM_SET","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("CRYPTO_IPSEC_TRANSFORM_SET","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort crypto ipsec profile
+    if (/^crypto ipsec profile (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(crypto ipsec profile |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^crypto ipsec authorization policy (\S+)/) {
+                ProcessHistory("CRYPTO_IPSEC_PROFILE","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("CRYPTO_IPSEC_PROFILE","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort netflow objects/record
+    if (/^flow record (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(flow record |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^flow record (\S+)/) {
+                ProcessHistory("FLOW_RECORD","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("FLOW_RECORD","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort netflow objects/exporter
+    if (/^flow exporter (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(flow exporter |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^flow exporter (\S+)/) {
+                ProcessHistory("FLOW_EXPORTER","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("FLOW_EXPORTER","keysort","$key","$sortdata");
+        redo;
+    }
+    # sort netflow objects/monitor
+    if (/^flow monitor (\S+)/) {
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(flow monitor |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^flow monitor (\S+)/) {
+                ProcessHistory("FLOW_MONITOR","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $sortdata .= $_;
+                $comment = 0;
+            }
+        }
+        ProcessHistory("FLOW_MONITOR","keysort","$key","$sortdata");
+        redo;
+    }
     # sort class-map
     if (/^class-map match-(any|all) (\S+)/) {
         my ($match, $key) = ($1,$2);
-        my ($classmap) = $_;
+        my ($sortdata) = $_;
         while(<$INPUT>) {
             tr/\015//d;
             last if (/^$prompt/ || ! /^(class-map | )/);
+            next if ($comment && /^!\s*$/);
             if (/^class-map match-(any|all) (\S+)/) {
-                ProcessHistory("CLASSMAP","keysort","$match:$key","$classmap");
+                ProcessHistory("CLASSMAP","keysort","$match:$key","$sortdata");
                 ($match, $key) = ($1, $2);
-                $classmap = $_;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
             } else {
-                $classmap .= $_;
+                $sortdata .= $_;
+                $comment = 0;
             }
         }
-        ProcessHistory("CLASSMAP","keysort","$match:$key","$classmap");
+        ProcessHistory("CLASSMAP","keysort","$match:$key","$sortdata");
         redo;
     }
     # sort policy-map
     if (/^policy-map (\S+)/) {
         my ($key) = $1;
-        my ($policymap) = $_;
+        my ($sortdata) = $_;
         while(<$INPUT>) {
             tr/\015//d;
             last if (/^$prompt/ || ! /^(policy-map | )/);
+            next if ($comment && /^!\s*$/);
             if (/^policy-map (\S+)/) {
-                ProcessHistory("POLICYMAP","keysort","$key","$policymap");
+                ProcessHistory("POLICYMAP","keysort","$key","$sortdata");
                 $key = $1;
-                $policymap = $_;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
             } else {
-                $policymap .= $_;
+                $sortdata .= $_;
+                $comment = 0;
             }
         }
-        ProcessHistory("POLICYMAP","keysort","$key","$policymap");
+        ProcessHistory("POLICYMAP","keysort","$key","$sortdata");
         redo;
     }
     # sort router eigrp af-interface
@@ -2758,13 +2961,13 @@ TOP:
         while(<$INPUT>) {
             tr/\015//d;
             last if (/^$prompt/ || /^!/);
-            if (/^(\s+)af-interface (\S+)/ {
+            if (/^(\s+)af-interface (\S+)/) {
                 my ($head, $key) = ($1,$2);
                 my ($sortdata) = $_;
                 while(<$INPUT>) {
                     tr/\015//d;
                     last if (/^$prompt/ || ! /^$head(exit-af-interface|[ !])/);
-                    if (/((\s+)af-interface (\S+)/) {
+                    if (/^(\s+)af-interface (\S+)/) {
                         ProcessHistory("EIGRP_AF_INTERFACE", "keysort", "$eigrp:$key", "$sortdata");
                         ($head, $key) = ($1,$2);
                         $sortdata = $_;
@@ -2782,20 +2985,26 @@ TOP:
     }
     # sort router ospf instance
     if (/^router ospf (\S+)/) {
-	    my ($key) = $1;
-	    my ($sortdata) = $_;
-	    while (<$INPUT>) {
-		    tr/\015//d;
-		    last if (/^$prompt/ || ! /^(router ospf |[ !])/);
-		    if (/^router ospf (\S+)/) {
-		        ProcessHistory("OSPF","keysort","$key","$sortdata");
-		        $key = $1;
-		        $sortdata = $_;
-		    } else  {
-		        $sortdata .= $_;
-		    }
-	    }
-	    ProcessHistory("OSPF","keysort","$key","$sortdata");
+        my ($key) = $1;
+        my ($sortdata) = $_;
+        while (<$INPUT>) {
+            tr/\015//d;
+            last if (/^$prompt/ || ! /^(router ospf |[ !])/);
+            next if ($comment && /^!\s*$/);
+            if (/^router ospf (\S+)/) {
+                ProcessHistory("OSPF","keysort","$key","$sortdata");
+                $key = $1;
+                $sortdata = $_;
+                $comment = 0;
+            } elsif (/^!\s*$/) {
+                $sortdata .= $_;
+                $comment++;
+            } else  {
+                $comment = 0;
+                $sortdata .= $_;
+            }
+        }
+        ProcessHistory("OSPF","keysort","$key","$sortdata");
         redo;
     }
     # sort router bgp template
@@ -2843,150 +3052,6 @@ TOP:
             }
             ProcessHistory("","","","$_");
         }
-        redo;
-    }
-    # sort aaa attribute list
-    if (/^aaa attribute list (\S+)/) {
-	    my ($key) = $1;
-	    my ($aaa_attribute_list) = $_;
-	    while (<$INPUT>) {
-		    tr/\015//d;
-		    last if (/^$prompt/ || ! /^(aaa attribute list |[ !])/);
-		    if (/^aaa attribute list (\S+)/) {
-		        ProcessHistory("AAA_ATTRIBUTE_LIST","keysort","$key","$aaa_attribute_list");
-		        $key = $1;
-		        $aaa_attribute_list = $_;
-		    } else  {
-		        $aaa_attribute_list .= $_;
-		    }
-	    }
-	    ProcessHistory("AAA_ATTRIBUTE_LIST","keysort","$key","$aaa_attribute_list");
-        redo;
-    }
-    # sort crypto ikev2 authorization policy
-    if (/^crypto ikev2 authorization policy (\S+)/) {
-	    my ($key) = $1;
-	    my ($sortdata) = $_;
-	    while (<$INPUT>) {
-		    tr/\015//d;
-		    last if (/^$prompt/ || ! /^(crypto ikev2 authorization policy |[ !])/);
-		    if (/^crypto ikev2 authorization policy (\S+)/) {
-		        ProcessHistory("CRYPTO_IKEv2_AUTH_POLICY","keysort","$key","$sortdata");
-		        $key = $1;
-		        $sortdata = $_;
-		    } else  {
-		        $sortdata .= $_;
-		    }
-	    }
-	    ProcessHistory("CRYPTO_IKEv2_AUTH_POLICY","keysort","$key","$sortdata");
-        redo;
-    }
-    # sort crypto ikev2 profile
-    if (/^crypto ikev2 profile (\S+)/) {
-	    my ($key) = $1;
-	    my ($sortdata) = $_;
-	    while (<$INPUT>) {
-		    tr/\015//d;
-		    last if (/^$prompt/ || ! /^(crypto ikev2 profile |[ !])/);
-		    if (/^crypto ikev2 profile (\S+)/) {
-		        ProcessHistory("CRYPTO_IKEv2_PROFILE","keysort","$key","$sortdata");
-		        $key = $1;
-		        $sortdata = $_;
-		    } else  {
-		        $sortdata .= $_;
-		    }
-	    }
-	    ProcessHistory("CRYPTO_IKEv2_PROFILE","keysort","$key","$sortdata");
-        redo;
-    }
-    # sort crypto ipsec transform-set
-    if (/^crypto ipsec transform-set (\S+)/) {
-	    my ($key) = $1;
-	    my ($sortdata) = $_;
-	    while (<$INPUT>) {
-		    tr/\015//d;
-		    last if (/^$prompt/ || ! /^(crypto ipsec transform-set |[ !])/);
-		    if (/^crypto ipsec transform-set (\S+)/) {
-		        ProcessHistory("CRYPTO_IPSEC_TRANSFORM_SET","keysort","$key","$sortdata");
-		        $key = $1;
-		        $sortdata = $_;
-		    } else  {
-		        $sortdata .= $_;
-		    }
-	    }
-	    ProcessHistory("CRYPTO_IPSEC_TRANSFORM_SET","keysort","$key","$sortdata");
-        redo;
-    }
-    # sort crypto ipsec profile
-    if (/^crypto ipsec profile (\S+)/) {
-	    my ($key) = $1;
-	    my ($sortdata) = $_;
-	    while (<$INPUT>) {
-		    tr/\015//d;
-		    last if (/^$prompt/ || ! /^(crypto ipsec profile |[ !])/);
-		    if (/^crypto ipsec authorization policy (\S+)/) {
-		        ProcessHistory("CRYPTO_IPSEC_PROFILE","keysort","$key","$sortdata");
-		        $key = $1;
-		        $sortdata = $_;
-		    } else  {
-		        $sortdata .= $_;
-		    }
-	    }
-	    ProcessHistory("CRYPTO_IPSEC_PROFILE","keysort","$key","$sortdata");
-        redo;
-    }
-    # sort netflow objects/record
-    if (/^flow record (\S+)/) {
-	    my ($key) = $1;
-	    my ($flow) = $_;
-	    while (<$INPUT>) {
-		    tr/\015//d;
-		    last if (/^$prompt/ || ! /^(flow record |[ !])/);
-		    if (/^flow record (\S+)/) {
-		        ProcessHistory("FLOW_RECORD","keysort","$key","$flow");
-		        $key = $1;
-		        $flow = $_;
-		    } else  {
-		        $flow .= $_;
-		    }
-	    }
-	    ProcessHistory("FLOW_RECORD","keysort","$key","$flow");
-        redo;
-    }
-    # sort netflow objects/exporter
-    if (/^flow exporter (\S+)/) {
-	    my ($key) = $1;
-	    my ($flow) = $_;
-	    while (<$INPUT>) {
-		    tr/\015//d;
-		    last if (/^$prompt/ || ! /^(flow exporter |[ !])/);
-		    if (/^flow exporter (\S+)/) {
-		        ProcessHistory("FLOW_EXPORTER","keysort","$key","$flow");
-		        $key = $1;
-		        $flow = $_;
-		    } else  {
-		        $flow .= $_;
-		    }
-	    }
-	    ProcessHistory("FLOW_EXPORTER","keysort","$key","$flow");
-        redo;
-    }
-    # sort netflow objects/monitor
-    if (/^flow monitor (\S+)/) {
-	    my ($key) = $1;
-	    my ($flow) = $_;
-	    while (<$INPUT>) {
-		    tr/\015//d;
-		    last if (/^$prompt/ || ! /^(flow monitor |[ !])/);
-		    if (/^flow monitor (\S+)/) {
-		        ProcessHistory("FLOW_MONITOR","keysort","$key","$flow");
-		        $key = $1;
-		        $flow = $_;
-		    } else  {
-		        $flow .= $_;
-		    }
-	    }
-	    ProcessHistory("FLOW_MONITOR","keysort","$key","$flow");
         redo;
     }
 	# filter out any RCS/CVS tags to avoid confusing local CVS storage

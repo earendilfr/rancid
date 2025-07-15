@@ -2961,12 +2961,12 @@ sub WriteTerm {
         while(<$INPUT>) {
             tr/\015//d;
             last if (/^$prompt/ || /^!/);
-            if (/^(\s+)af-interface (\S+)/) {
+            if (/^(\s+)af-interface ((?!default)\S+)/) {
                 my ($head, $key) = ($1,$2);
                 my ($sortdata) = $_;
                 while(<$INPUT>) {
                     tr/\015//d;
-                    last if (/^$prompt/ || ! /^$head(exit-af-interface|[ !])/);
+                    last if (/^$prompt/ || ! /^$head(exit-af-interface|[ !]|af-interface)/);
                     if (/^(\s+)af-interface (\S+)/) {
                         ProcessHistory("EIGRP_AF_INTERFACE", "keysort", "$eigrp:$key", "$sortdata");
                         ($head, $key) = ($1,$2);

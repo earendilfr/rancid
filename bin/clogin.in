@@ -525,6 +525,11 @@ proc run_commands { prompt command } {
 	    	send -h "quit\r"
 	    	exp_continue;
 	    }
+        "% Invalid input detected at '^' marker." {
+            # Some devices (BES switches by example) required quit to exit the session
+            send -h "quit\r"
+            exp_continue;
+        }
 	    "The system has unsaved changes"	{ # Force10 SFTOS
 	    	if {$do_saveconfig} {
 	    	  catch {send "y\r"}

@@ -21,6 +21,7 @@ our $ios;
 our $found_version;
 our $found_env;
 our $found_diag;
+our $found_boot;
 our $found_inventory;
 our $config_register;			# configuration register value
 
@@ -59,6 +60,7 @@ sub init {
     $found_version = 0;
     $found_env = 0;
     $found_diag = 0;
+    $found_boot = 0;
     $found_inventory = 0;
     $config_register = undef;		# configuration register value
 
@@ -1122,11 +1124,12 @@ sub ShowBoot {
 
     while (<$INPUT>) {
 	tr/\015//d;
-	last if (/^$prompt/);
+	if (/^$prompt/) { $found_boot = 1; last};
 	next if (/^(\s*|\s*$cmd\s*)$/);
 	next if (/^\s+\^$/);
 	next if (/^Load for five/);
 	next if (/^Time source is/);
+    return(0) if ($found_boot);
 	return(1) if (/Line has invalid autocommand /);
 	return(1) if (/(invalid (input|command) detected|type help or )/i);
 	return(1) if (/Ambiguous command/i);
